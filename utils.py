@@ -311,3 +311,27 @@ def prepare_input_for_lstm_crf(all_training_data, is_training=True):
 		all_sequences.append(s)
 		all_labels.append(l)
 	return all_sequences, all_labels
+
+def impute_missing_data(data):
+	df = pd.DataFrame(data=data)
+	df = df.interpolate()
+	df = df.fillna(method ='ffill')
+	df = df.fillna(df.mean())
+	df = df.fillna(0)
+
+	return df.values
+
+# def prepare_input_for_lstm_crf_from_numpy_arrays(all_training_data, is_training=False):
+# 	all_sequences = []
+# 	all_labels = []
+# 	for i, training_data in enumerate(all_training_data):
+# 		s = training_data
+
+
+# 		if is_training:
+# 			l = training_data['SepsisLabel']
+# 		else:
+# 			l = 0
+# 		all_sequences.append(s)
+# 		all_labels.append(l)
+# 	return all_sequences, all_labels
