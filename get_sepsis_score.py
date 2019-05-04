@@ -157,11 +157,16 @@ def load_sepsis_model():
     # out = TimeDistributed(Dense(2, kernel_initializer='random_uniform',
     #                             activation='softmax'
     #                             ))(x)
-    model = Model(input_x, out)
 
-    adam = optimizers.Adam(lr=0.001, epsilon=1e-5,
-                           clipvalue=0.8, amsgrad=True)
-    model.compile(optimizer=adam, loss=crf_loss, metrics=[], sample_weight_mode = 'temporal')
+    model_list = []
+    for k_fold in range(5):
+        model = Model(input_x, out)
+
+        adam = optimizers.Adam(lr=0.001, epsilon=1e-5,
+                            clipvalue=0.8, amsgrad=True)
+        model.compile(optimizer=adam, loss=crf_loss, metrics=[], sample_weight_mode = 'temporal')
+        model.load_weights(filepath='best_model_fold_'+str(k_fold)+'.ckpt')
+        model_list.append(model)
 
 
     
@@ -188,12 +193,12 @@ def load_sepsis_model():
     #     else:
     #         scores += model.predict(np.array(X_test[0]).reshape((1, len(X_test[0]), 40)))[0]
     # return scores/5.0    
-    return model
+    return model_list
 
 
 
 
-def get_sepsis_score(data, model):
+def get_sepsis_score(data, model_list):
     #read challenge data
     #data = get_data_from_file(input_file)
     # X_test, _ = prepare_input_for_lstm_crf([data], is_training=False)
@@ -216,11 +221,11 @@ def get_sepsis_score(data, model):
     
     for k_fold in range(5):
 
-        model.load_weights(filepath='best_model_fold_'+str(k_fold)+'.ckpt')
+        # model_list[k_fold].load_weights(filepath='best_model_fold_'+str(k_fold)+'.ckpt')
         if k_fold == 0:
-            scores = model.predict(np.array(X_test[0]).reshape((1, len(X_test[0]), 40)))[0]
+            scores = model_list[k_fold].predict(np.array(X_test[0]).reshape((1, len(X_test[0]), 40)))[0]
         else:
-            scores += model.predict(np.array(X_test[0]).reshape((1, len(X_test[0]), 40)))[0]
+            scores += model_list[k_fold].predict(np.array(X_test[0]).reshape((1, len(X_test[0]), 40)))[0]
         # print(scores)
     scores = scores/5.0
     current_score = scores[-1][1]
