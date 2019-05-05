@@ -229,7 +229,7 @@ def get_sepsis_score(data, model_list):
         # print(scores)
     scores = scores/5.0
     current_score = scores[-1][1]
-    if current_score >=0.88:
+    if current_score >=0.14:
         label = 1
     else:
         label = 0
