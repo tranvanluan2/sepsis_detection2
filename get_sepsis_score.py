@@ -35,7 +35,7 @@ def load_sepsis_model():
     num_features = 40
     input_x = Input(shape=(None, num_features))
     # x = input_x
-    x = GaussianNoise(0.01)(input_x)
+    x = GaussianNoise(0.02)(input_x)
 
     n_feature_maps = num_features
     # print('build conv_x')
@@ -53,14 +53,14 @@ def load_sepsis_model():
 
     # print("Y output shaspe ", y.get_shape())
     y = x
-    for k in range(6):
+    for k in range(9):
         # print("k = ", k)
         # print('build conv_x')
         x1 = y
         conv_x = keras.layers.normalization.BatchNormalization()(x1)
         conv_x = Activation('relu')(conv_x)
         conv_x = Dropout(0.5)(conv_x)
-        conv_x = Conv1D(n_feature_maps, 12, strides=1, padding="same",kernel_regularizer=regularizers.l2(0.05))(conv_x)
+        conv_x = Conv1D(n_feature_maps, 12, strides=1, padding="same",kernel_regularizer=regularizers.l2(0.03))(conv_x)
         # if k == 0:
         #     conv_x = MaxPooling1D(padding='same')(conv_x)
         conv_x = keras.layers.normalization.BatchNormalization()(conv_x)
@@ -79,10 +79,10 @@ def load_sepsis_model():
         # conv_x = Activation('relu')(conv_x)
 
         # conv_x = LSTM(units=n_feature_maps, return_sequences=True, recurrent_dropout=0.15)(conv_x)
-        conv_x = Bidirectional(LSTM(
-            units=n_feature_maps/2, return_sequences=True, recurrent_dropout=0.5, kernel_regularizer=regularizers.l2(0.05)))(conv_x)
-        conv_x = keras.layers.normalization.BatchNormalization()(conv_x)
-        conv_x = Activation('relu')(conv_x)
+        # conv_x = Bidirectional(LSTM(
+        #     units=n_feature_maps/2, return_sequences=True, recurrent_dropout=0.5, kernel_regularizer=regularizers.l2(0.03)))(conv_x)
+        # conv_x = keras.layers.normalization.BatchNormalization()(conv_x)
+        # conv_x = Activation('relu')(conv_x)
 
         # conv_x = Bidirectional(LSTM(units=n_feature_maps/2, return_sequences=True, recurrent_dropout=0.5) )(conv_x)
         # conv_x = keras.layers.normalization.BatchNormalization()(conv_x)
@@ -145,9 +145,12 @@ def load_sepsis_model():
     #     activation='relu'
     #     # , kernel_regularizer=regularizers.l1(0.001)
     #     ))(x)
-    crf = CRF(2, sparse_target=False, learn_mode='marginal')  # CRF layer
-    out = crf(x)  # output
-    # out = Dense(1, activation='sigmoid')(x)
+    # crf = CRF(10, sparse_target=False, learn_mode='marginal')  # CRF layer
+    # x = crf(x)  # output
+    x = GlobalAveragePooling1D()(x)
+    x = Dense(40,activation='relu')(x)
+    x = Dense(20,activation='relu')(x)
+    out = Dense(2, activation='softmax')(x)
     # model = Model(input_x, out)
 
     # x = y
@@ -157,14 +160,14 @@ def load_sepsis_model():
     # out = TimeDistributed(Dense(2, kernel_initializer='random_uniform',
     #                             activation='softmax'
     #                             ))(x)
-
     model_list = []
     for k_fold in range(5):
         model = Model(input_x, out)
 
         adam = optimizers.Adam(lr=0.001, epsilon=1e-5,
                             clipvalue=0.8, amsgrad=True)
-        model.compile(optimizer=adam, loss=crf_loss, metrics=[], sample_weight_mode = 'temporal')
+        model.compile(optimizer=adam, loss='categorical_crossentropy',
+                  metrics=[])
         model.load_weights(filepath='best_model_fold_'+str(k_fold)+'.ckpt')
         model_list.append(model)
 
@@ -219,18 +222,17 @@ def get_sepsis_score(data, model_list):
         X_test[idx] = (t_sequence - min_data) / \
             (max_data - min_data + 1e-8)
     
-    for k_fold in range(5):
+    for k_fold in [0,1,2,3,4]:
 
         # model_list[k_fold].load_weights(filepath='best_model_fold_'+str(k_fold)+'.ckpt')
         if k_fold == 0:
-            scores = model_list[k_fold].predict(np.array(X_test[0]).reshape((1, len(X_test[0]), 40)))[0]
+            score = model_list[k_fold].predict(np.array(X_test[0]).reshape((1, len(X_test[0]), 40)))[0][1]
         else:
-            scores += model_list[k_fold].predict(np.array(X_test[0]).reshape((1, len(X_test[0]), 40)))[0]
+            score +=model_list[k_fold].predict(np.array(X_test[0]).reshape((1, len(X_test[0]), 40)))[0][1]
         # print(scores)
-    scores = scores/5.0
-    current_score = scores[-1][1]
-    if current_score >=0.14:
+    score /=5
+    if score >=0.81:
         label = 1
     else:
         label = 0
-    return current_score, label
+    return score, label
